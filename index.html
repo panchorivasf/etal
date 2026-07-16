@@ -63,7 +63,10 @@
   .a-name{width:100%;border:none;background:transparent;font-size:14.5px;color:var(--ink);padding:2px 0;outline:none;font-weight:500}
   .a-name:focus{border-bottom:1px solid var(--teal-line)}
   .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;align-items:center}
-  .chip{display:inline-flex;align-items:center;gap:5px;background:var(--paper);border:1px solid var(--rule-strong);border-radius:20px;padding:2px 5px 2px 8px;font-size:12px;max-width:340px}
+  .chip{display:inline-flex;align-items:center;gap:5px;background:var(--paper);border:1px solid var(--rule-strong);border-radius:20px;padding:2px 5px 2px 8px;font-size:12px;max-width:340px;cursor:grab;user-select:none}
+  .chip.dragging{opacity:.45;cursor:grabbing}
+  .chip.drop-before{box-shadow:inset 2px 0 0 var(--teal)}
+  .chip.drop-after{box-shadow:inset -2px 0 0 var(--teal)}
   .chip .n{font-family:var(--mono);color:var(--teal);font-weight:600}
   .chip .t{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .chip .x{border:none;background:none;color:#B6B0A2;font-size:14px;line-height:1;padding:0 2px}
@@ -186,6 +189,7 @@
         <li><strong>Sort selected A–Z</strong> — alphabetize only the checked authors, keeping their slots.</li>
         <li><strong>Dedupe</strong> — drop repeated names and merge their affiliations.</li>
         <li><kbd>+ affiliation</kbd> — attach an existing affiliation or type a new one.</li>
+        <li>Drag affiliation chips to reorder superscripts for that author.</li>
       </ul>
 
       <h3>Affiliations</h3>
@@ -376,7 +380,8 @@ function renderAuthors(num){
     const chips = au.affs.map(aid=>{
       const aff = state.affById.get(aid); if(!aff) return "";
       const n = num.get(aid) || "·";
-      return '<span class="chip"><span class="n">'+n+'</span>'+
+      return '<span class="chip" draggable="true" data-aff="'+aid+'" title="Drag to reorder">'+
+             '<span class="n">'+n+'</span>'+
              '<span class="t" title="'+esc(aff.text)+'">'+esc(aff.text||"(empty)")+'</span>'+
              '<button class="x" data-act="unlink" data-aff="'+aid+'" title="Remove from this author">×</button></span>';
     }).join("");
@@ -418,6 +423,7 @@ function renderAuthors(num){
     row.querySelectorAll('[data-act="unlink"]').forEach(b=>{
       b.onclick = ()=>{ au.affs = au.affs.filter(x=>x!==b.dataset.aff); render(); };
     });
+    row.querySelectorAll(".chip[data-aff]").forEach(chip=> attachChipDrag(chip, au) );
 
     attachDrag(row, au.id);
     host.appendChild(row);
@@ -512,6 +518,53 @@ function moveAuthors(ids, targetId, before){
   ti = before ? ti : ti+1;
   rest.splice(ti, 0, ...moving);
   state.authors = rest;
+  render();
+}
+
+/* ---------- affiliation chip drag within one author ---------- */
+let dragAffId = null;
+function attachChipDrag(chip, au){
+  chip.addEventListener("dragstart", e=>{
+    if(e.target.closest('[data-act="unlink"]')){ e.preventDefault(); return; }
+    e.stopPropagation();
+    dragAffId = chip.dataset.aff;
+    chip.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try{ e.dataTransfer.setData("text/plain", dragAffId); }catch(_){}
+  });
+  chip.addEventListener("dragend", ()=>{
+    chip.classList.remove("dragging");
+    clearChipDropMarks();
+    dragAffId = null;
+  });
+  chip.addEventListener("dragover", e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    if(!dragAffId || chip.dataset.aff === dragAffId) return;
+    const before = (e.clientX - chip.getBoundingClientRect().left) < chip.offsetWidth/2;
+    clearChipDropMarks();
+    chip.classList.add(before ? "drop-before" : "drop-after");
+  });
+  chip.addEventListener("drop", e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const before = (e.clientX - chip.getBoundingClientRect().left) < chip.offsetWidth/2;
+    clearChipDropMarks();
+    if(!dragAffId || dragAffId === chip.dataset.aff) return;
+    moveAuthorAff(dragAffId, chip.dataset.aff, au, before);
+  });
+}
+function clearChipDropMarks(){
+  document.querySelectorAll(".chip").forEach(c=>c.classList.remove("drop-before","drop-after"));
+}
+function moveAuthorAff(sourceId, targetId, au, before){
+  const from = au.affs.indexOf(sourceId);
+  if(from < 0) return;
+  au.affs.splice(from, 1);
+  let to = au.affs.indexOf(targetId);
+  if(to < 0) return;
+  const insertAt = before ? to : to + 1;
+  au.affs.splice(insertAt, 0, sourceId);
   render();
 }
 
