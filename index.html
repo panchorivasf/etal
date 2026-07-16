@@ -240,9 +240,19 @@
       <p id="citePlain" style="font-family:var(--mono);font-size:12.5px;background:var(--paper);border:1px solid var(--rule);border-radius:9px;padding:12px 14px;margin:8px 0 0;white-space:pre-wrap">Francisco Rivas. etal: author &amp; affiliation manager (2026). https://panchorivasf.github.io/etal/
 1. Department of Forestry and Natural Resources, Purdue University, West Lafayette, IN, USA.
 2. Museo Bioacústico, Concepción, Chile.</p>
+
+      <h3>BibTeX</h3>
+      <pre id="citeBibtex" style="font-family:var(--mono);font-size:12px;line-height:1.5;background:var(--paper);border:1px solid var(--rule);border-radius:9px;padding:12px 14px;margin:8px 0 0;white-space:pre-wrap;overflow:auto">@software{rivas_etal_2026,
+  author       = {Rivas, Francisco},
+  title        = {etal: author \&amp; affiliation manager},
+  year         = {2026},
+  url          = {https://panchorivasf.github.io/etal/},
+  note         = {Department of Forestry and Natural Resources, Purdue University, West Lafayette, IN, USA; Museo Bioacústico, Concepción, Chile}
+}</pre>
     </div>
     <div class="modal-foot">
       <button type="button" class="btn" id="btnCopyCite">Copy citation</button>
+      <button type="button" class="btn" id="btnCopyBibtex">Copy BibTeX</button>
       <button type="button" class="btn primary" data-close="modalCite">Close</button>
     </div>
   </div>
@@ -457,7 +467,12 @@ function renderAffs(num){
     const ta = row.querySelector(".aff-text");
     const fit = ()=>{ ta.style.height="auto"; ta.style.height=ta.scrollHeight+"px"; };
     requestAnimationFrame(fit);
-    ta.addEventListener("input", e=>{ aff.text=e.target.value; fit(); updatePreview(); });
+    ta.addEventListener("input", e=>{
+      aff.text=e.target.value;
+      fit();
+      syncAffChips(aff.id, aff.text);
+      updatePreview();
+    });
     row.querySelector(".aff-del").onclick = ()=>{
       if(u>0 && !confirm("This affiliation is used by "+u+" author(s). Delete it and remove those links?")) return;
       state.authors.forEach(a=>a.affs=a.affs.filter(x=>x!==aff.id));
@@ -482,6 +497,14 @@ function updatePreview(num){
   const ordered = [...state.affs].filter(a=>num.has(a.id)).sort((a,b)=>num.get(a.id)-num.get(b.id));
   const affs = ordered.map(a=>'<span class="pa"><sup>'+num.get(a.id)+'</sup> '+esc(a.text||"(empty)")+'</span>').join("");
   pv.innerHTML = '<div class="pv-line">'+line+'</div>'+(affs?'<div class="pv-affs">'+affs+'</div>':'');
+}
+
+function syncAffChips(affId, text){
+  const label = text || "(empty)";
+  document.querySelectorAll('.chip[data-aff="'+affId+'"] .t').forEach(el=>{
+    el.textContent = label;
+    el.title = text || "";
+  });
 }
 
 /* ============================================================
@@ -974,6 +997,15 @@ document.getElementById("btnCopyCite").onclick=async()=>{
     toast("Citation copied.");
   }catch(_){
     toast("Couldn't copy — select the plain text manually.",true);
+  }
+};
+document.getElementById("btnCopyBibtex").onclick=async()=>{
+  const text=document.getElementById("citeBibtex").textContent;
+  try{
+    await navigator.clipboard.writeText(text);
+    toast("BibTeX copied.");
+  }catch(_){
+    toast("Couldn't copy — select the BibTeX manually.",true);
   }
 };
 
