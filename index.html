@@ -121,6 +121,30 @@
   .menu .opt.new{color:var(--teal);font-weight:500}
   .sep{height:1px;background:var(--rule);margin:5px 2px}
 
+  /* ---- help / cite modals ---- */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(27,26,23,.38);z-index:80;display:none;align-items:center;justify-content:center;padding:24px}
+  .modal-backdrop.open{display:flex}
+  .modal-backdrop[hidden]{display:none!important}
+  .modal{background:var(--panel);border:1px solid var(--rule-strong);border-radius:12px;box-shadow:var(--shadow);width:min(640px,100%);max-height:min(82vh,720px);display:flex;flex-direction:column;overflow:hidden}
+  .modal-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--rule)}
+  .modal-head h2{margin:0;font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
+  .modal-head .close{margin-left:auto;border:none;background:none;color:var(--muted);font-size:20px;line-height:1;padding:2px 6px;border-radius:6px}
+  .modal-head .close:hover{background:var(--teal-soft);color:var(--teal)}
+  .modal-body{padding:16px 18px 20px;overflow:auto;font-size:13.5px;line-height:1.55;color:var(--ink)}
+  .modal-body h3{margin:18px 0 6px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .modal-body h3:first-child{margin-top:0}
+  .modal-body p,.modal-body li{color:#3a3833}
+  .modal-body ul{margin:6px 0 0;padding-left:1.15em}
+  .modal-body li{margin:4px 0}
+  .modal-body kbd{font-family:var(--mono);font-size:11.5px;background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:1px 5px}
+  .cite-block{background:var(--paper);border:1px solid var(--rule);border-radius:9px;padding:12px 14px;font-family:var(--serif);font-size:14.5px;line-height:1.65;margin:8px 0 12px}
+  .cite-block sup{color:var(--teal);font-size:.72em}
+  .cite-affs{margin-top:10px;padding-top:10px;border-top:1px solid var(--rule);font-size:12.5px;line-height:1.55;color:#3a3833}
+  .cite-affs div{margin:2px 0}
+  .cite-meta{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .cite-meta a{color:var(--teal)}
+  .modal-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--rule);background:var(--paper)}
+
   @media (max-width:860px){
     .wrap{grid-template-columns:1fr;height:auto}
     .col{border-right:none;border-bottom:1px solid var(--rule)}
@@ -135,6 +159,8 @@
     <span class="tag">author &amp; affiliation manager</span>
   </div>
   <div class="top-actions">
+    <button class="btn ghost" id="btnGuide">Guide</button>
+    <button class="btn ghost" id="btnCite">How to cite</button>
     <button class="btn ghost" id="btnNew">New</button>
     <button class="btn" id="btnImportDocx">Import DOCX</button>
     <button class="btn ghost" id="btnImportJson">Open project</button>
@@ -142,6 +168,81 @@
     <button class="btn primary" id="btnExportDocx">Export DOCX</button>
   </div>
 </header>
+
+<div class="modal-backdrop" id="modalGuide" role="dialog" aria-modal="true" aria-labelledby="guideTitle" hidden>
+  <div class="modal" role="document">
+    <div class="modal-head">
+      <h2 id="guideTitle">Guide</h2>
+      <button type="button" class="close" data-close="modalGuide" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <h3>What etal does</h3>
+      <p>Build a manuscript-ready author list with numbered affiliations. Authors stay in order; affiliation numbers update automatically from first appearance.</p>
+
+      <h3>Authors</h3>
+      <ul>
+        <li><strong>Add author</strong> — create a blank name field.</li>
+        <li>Drag the handle to reorder; checkboxes select several authors.</li>
+        <li><strong>Sort selected A–Z</strong> — alphabetize only the checked authors, keeping their slots.</li>
+        <li><strong>Dedupe</strong> — drop repeated names and merge their affiliations.</li>
+        <li><kbd>+ affiliation</kbd> — attach an existing affiliation or type a new one.</li>
+      </ul>
+
+      <h3>Affiliations</h3>
+      <ul>
+        <li>Edit text in the right column. Numbers are assigned by the order authors first use them.</li>
+        <li><strong>Merge identical</strong> — combine duplicate affiliation strings.</li>
+        <li>Unused affiliations stay listed but fade; delete when you no longer need them.</li>
+      </ul>
+
+      <h3>Import &amp; export</h3>
+      <ul>
+        <li><strong>Import DOCX</strong> — Word file with an author paragraph (superscript numbers) and affiliation paragraphs below.</li>
+        <li><strong>Export DOCX</strong> — same layout, with live Word superscripts.</li>
+        <li><strong>Save / Open project</strong> — JSON backup of your full list.</li>
+      </ul>
+
+      <h3>Preview</h3>
+      <p>The dock at the bottom shows the author line and numbered affiliations. <strong>Copy author line</strong> keeps superscripts when you paste into Word.</p>
+
+      <h3>Privacy</h3>
+      <p>Everything runs in your browser. Files you open are not uploaded to a server.</p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn primary" data-close="modalGuide">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalCite" role="dialog" aria-modal="true" aria-labelledby="citeTitle" hidden>
+  <div class="modal" role="document">
+    <div class="modal-head">
+      <h2 id="citeTitle">How to cite</h2>
+      <button type="button" class="close" data-close="modalCite" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <h3>Suggested citation</h3>
+      <div class="cite-block" id="citeBlock">
+        Francisco Rivas<sup>1,2</sup>. <em>etal</em>: author &amp; affiliation manager (2026).
+        <div class="cite-affs">
+          <div><sup>1</sup> Department of Forestry and Natural Resources, Purdue University, West Lafayette, IN, USA.</div>
+          <div><sup>2</sup> Museo Bioacústico, Concepción, Chile.</div>
+        </div>
+      </div>
+      <p class="cite-meta">Available at <a href="https://panchorivasf.github.io/etal/" target="_blank" rel="noopener">https://panchorivasf.github.io/etal/</a></p>
+      <p class="cite-meta">Source: <a href="https://github.com/panchorivasf/etal" target="_blank" rel="noopener">github.com/panchorivasf/etal</a></p>
+
+      <h3>Plain text</h3>
+      <p id="citePlain" style="font-family:var(--mono);font-size:12.5px;background:var(--paper);border:1px solid var(--rule);border-radius:9px;padding:12px 14px;margin:8px 0 0;white-space:pre-wrap">Francisco Rivas. etal: author &amp; affiliation manager (2026). https://panchorivasf.github.io/etal/
+1. Department of Forestry and Natural Resources, Purdue University, West Lafayette, IN, USA.
+2. Museo Bioacústico, Concepción, Chile.</p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn" id="btnCopyCite">Copy citation</button>
+      <button type="button" class="btn primary" data-close="modalCite">Close</button>
+    </div>
+  </div>
+</div>
 
 <div class="wrap" id="wrap">
   <!-- AUTHORS -->
@@ -784,6 +885,44 @@ document.getElementById("fileDocx").onchange=e=>{ if(e.target.files[0]) importDo
 document.getElementById("fileJson").onchange=e=>{ if(e.target.files[0]) openJson(e.target.files[0]); e.target.value=""; };
 document.getElementById("btnToggleDock").onclick=()=>document.getElementById("dock").classList.toggle("collapsed");
 window.addEventListener("resize",()=>{ if(openMenu) closeMenu(); });
+
+/* ---------- Guide & How to cite ---------- */
+function openModal(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.hidden=false;
+  el.classList.add("open");
+}
+function closeModal(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.classList.remove("open");
+  el.hidden=true;
+}
+document.getElementById("btnGuide").onclick=()=>openModal("modalGuide");
+document.getElementById("btnCite").onclick=()=>openModal("modalCite");
+document.querySelectorAll("[data-close]").forEach(btn=>{
+  btn.onclick=()=>closeModal(btn.getAttribute("data-close"));
+});
+document.querySelectorAll(".modal-backdrop").forEach(backdrop=>{
+  backdrop.addEventListener("click",e=>{ if(e.target===backdrop) closeModal(backdrop.id); });
+});
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape") return;
+  ["modalGuide","modalCite"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el && el.classList.contains("open")) closeModal(id);
+  });
+});
+document.getElementById("btnCopyCite").onclick=async()=>{
+  const text=document.getElementById("citePlain").textContent;
+  try{
+    await navigator.clipboard.writeText(text);
+    toast("Citation copied.");
+  }catch(_){
+    toast("Couldn't copy — select the plain text manually.",true);
+  }
+};
 
 /* ---------- demo seed so the app isn't empty on first open ---------- */
 (function seed(){
