@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>etal — author &amp; affiliation manager</title>
+<style>
+  :root{
+    --paper:#FBFAF7; --panel:#FFFFFF; --ink:#1B1A17; --muted:#6E6A60;
+    --rule:#E6E2D8; --rule-strong:#D6D1C4;
+    --teal:#0F5C5C; --teal-soft:rgba(15,92,92,.09); --teal-line:rgba(15,92,92,.35);
+    --ox:#8A3A3A; --ox-soft:rgba(138,58,58,.08);
+    --amber:#9A6B16; --amber-soft:#FBF3E0;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --shadow:0 1px 2px rgba(27,26,23,.04),0 8px 24px rgba(27,26,23,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;font-size:13px;cursor:pointer}
+  input,textarea{font-family:inherit}
+
+  /* ---- top bar ---- */
+  header.app{display:flex;align-items:center;gap:18px;padding:12px 22px;border-bottom:1px solid var(--rule);background:var(--panel);position:sticky;top:0;z-index:30}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand .mark{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:-.01em}
+  .brand .mark sup{color:var(--teal);font-size:.55em;top:-.7em}
+  .brand .tag{color:var(--muted);font-size:12px;letter-spacing:.02em}
+  .top-actions{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .btn{border:1px solid var(--rule-strong);background:var(--panel);color:var(--ink);padding:7px 13px;border-radius:7px;transition:.13s;white-space:nowrap}
+  .btn:hover{border-color:var(--teal-line);background:var(--teal-soft)}
+  .btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+  .btn.primary:hover{background:#0c4d4d}
+  .btn.ghost{border-color:transparent;background:transparent}
+  .btn.ghost:hover{background:var(--teal-soft)}
+  .btn.danger:hover{border-color:var(--ox);background:var(--ox-soft);color:var(--ox)}
+  .btn[disabled]{opacity:.4;cursor:not-allowed}
+
+  /* ---- workbench ---- */
+  .wrap{display:grid;grid-template-columns:1.35fr 1fr;gap:0;height:calc(100% - 58px)}
+  .col{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--rule)}
+  .col:last-child{border-right:none}
+  .col-head{display:flex;align-items:center;gap:10px;padding:11px 20px;border-bottom:1px solid var(--rule);background:var(--paper);position:sticky;top:0;z-index:10}
+  .col-head .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .col-head .count{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--rule);border-radius:20px;padding:1px 8px}
+  .col-tools{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  .scroll{overflow:auto;padding:12px 16px 120px;flex:1}
+
+  /* ---- author rows ---- */
+  .author{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border:1px solid transparent;border-radius:9px;margin-bottom:2px;background:transparent}
+  .author:hover{background:#fff;border-color:var(--rule)}
+  .author.sel{background:var(--teal-soft);border-color:var(--teal-line)}
+  .author.dragging{opacity:.45}
+  .author.drop-before{box-shadow:inset 0 2px 0 var(--teal)}
+  .author.drop-after{box-shadow:inset 0 -2px 0 var(--teal)}
+  .handle{cursor:grab;color:#C3BEB0;font-size:16px;line-height:1.4;padding:2px 2px 0;user-select:none;flex:none}
+  .author:hover .handle{color:var(--muted)}
+  .idx{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:24px;text-align:right;padding-top:4px;flex:none}
+  .a-check{margin-top:5px;flex:none;accent-color:var(--teal);width:15px;height:15px}
+  .a-body{flex:1;min-width:0}
+  .a-name{width:100%;border:none;background:transparent;font-size:14.5px;color:var(--ink);padding:2px 0;outline:none;font-weight:500}
+  .a-name:focus{border-bottom:1px solid var(--teal-line)}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;align-items:center}
+  .chip{display:inline-flex;align-items:center;gap:5px;background:var(--paper);border:1px solid var(--rule-strong);border-radius:20px;padding:2px 5px 2px 8px;font-size:12px;max-width:340px}
+  .chip .n{font-family:var(--mono);color:var(--teal);font-weight:600}
+  .chip .t{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip .x{border:none;background:none;color:#B6B0A2;font-size:14px;line-height:1;padding:0 2px}
+  .chip .x:hover{color:var(--ox)}
+  .add-aff{border:1px dashed var(--rule-strong);background:none;color:var(--muted);border-radius:20px;padding:2px 9px;font-size:12px}
+  .add-aff:hover{border-color:var(--teal-line);color:var(--teal)}
+  .a-del{border:none;background:none;color:#C3BEB0;font-size:15px;padding:2px 4px;flex:none}
+  .a-del:hover{color:var(--ox)}
+
+  /* ---- affiliation rows ---- */
+  .aff{display:flex;gap:10px;padding:9px 8px;border-bottom:1px solid var(--rule);align-items:flex-start}
+  .aff .num{font-family:var(--mono);font-size:13px;color:var(--teal);font-weight:600;min-width:30px;text-align:right;padding-top:6px;flex:none}
+  .aff.unused .num{color:#C0BBAD}
+  .aff-text{flex:1;border:1px solid transparent;border-radius:6px;background:transparent;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--ink);padding:5px 7px;resize:vertical;min-height:32px;outline:none}
+  .aff-text:hover{border-color:var(--rule)}
+  .aff-text:focus{border-color:var(--teal-line);background:#fff}
+  .aff-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none;padding-top:4px}
+  .use{font-family:var(--mono);font-size:10px;color:var(--muted)}
+  .aff-del{border:none;background:none;color:#C8C3B5;font-size:14px}
+  .aff-del:hover{color:var(--ox)}
+  .aff.unused{background:repeating-linear-gradient(180deg,transparent,transparent 5px,#FCFBF8 5px,#FCFBF8 6px)}
+
+  /* ---- preview dock ---- */
+  .dock{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--rule-strong);box-shadow:0 -8px 24px rgba(27,26,23,.05);z-index:25}
+  .dock-head{display:flex;align-items:center;gap:12px;padding:7px 22px;border-bottom:1px solid var(--rule)}
+  .dock-head .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .dock-head .hint{font-size:11.5px;color:var(--muted)}
+  .dock-actions{margin-left:auto;display:flex;gap:8px}
+  .preview{font-family:var(--serif);font-size:14px;line-height:1.7;padding:14px 22px;max-height:26vh;overflow:auto}
+  .preview sup{color:var(--teal);font-size:.72em}
+  .preview .pv-affs{margin-top:10px;padding-top:10px;border-top:1px solid var(--rule);color:#3a3833;font-size:12.5px;line-height:1.6}
+  .preview .pv-affs .pa{display:block}
+  .preview .pv-affs sup{color:var(--teal)}
+  .dock.collapsed .preview{display:none}
+  .chev{transition:transform .15s}
+  .dock.collapsed .chev{transform:rotate(180deg)}
+
+  /* ---- empty state ---- */
+  .empty{max-width:440px;margin:9vh auto;text-align:center;color:var(--muted)}
+  .empty .big{font-family:var(--serif);font-size:26px;color:var(--ink);margin-bottom:6px}
+  .empty .big sup{color:var(--teal);font-size:.5em}
+  .empty p{margin:6px 0 18px}
+  .empty .row{display:flex;gap:10px;justify-content:center}
+
+  /* ---- toast + menu ---- */
+  .toast{position:fixed;bottom:auto;top:70px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:60}
+  .toast.show{opacity:1}
+  .toast.err{background:var(--ox)}
+  .menu{position:fixed;background:#fff;border:1px solid var(--rule-strong);border-radius:9px;box-shadow:var(--shadow);padding:6px;z-index:50;min-width:240px;max-height:300px;overflow:auto}
+  .menu input{width:100%;border:1px solid var(--rule);border-radius:6px;padding:7px 8px;font-size:12.5px;margin-bottom:5px;outline:none}
+  .menu input:focus{border-color:var(--teal-line)}
+  .menu .opt{padding:6px 8px;border-radius:6px;font-size:12.5px;color:var(--ink);cursor:pointer;display:flex;gap:8px}
+  .menu .opt:hover,.menu .opt.active{background:var(--teal-soft)}
+  .menu .opt .on{font-family:var(--mono);color:var(--teal);font-weight:600;flex:none}
+  .menu .opt.new{color:var(--teal);font-weight:500}
+  .sep{height:1px;background:var(--rule);margin:5px 2px}
+
+  @media (max-width:860px){
+    .wrap{grid-template-columns:1fr;height:auto}
+    .col{border-right:none;border-bottom:1px solid var(--rule)}
+    .scroll{max-height:48vh}
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <div class="brand">
+    <span class="mark">etal<sup>1,2</sup></span>
+    <span class="tag">author &amp; affiliation manager</span>
+  </div>
+  <div class="top-actions">
+    <button class="btn ghost" id="btnNew">New</button>
+    <button class="btn" id="btnImportDocx">Import DOCX</button>
+    <button class="btn ghost" id="btnImportJson">Open project</button>
+    <button class="btn ghost" id="btnSaveJson">Save project</button>
+    <button class="btn primary" id="btnExportDocx">Export DOCX</button>
+  </div>
+</header>
+
+<div class="wrap" id="wrap">
+  <!-- AUTHORS -->
+  <section class="col">
+    <div class="col-head">
+      <span class="eyebrow">Authors</span>
+      <span class="count" id="authorCount">0</span>
+      <div class="col-tools">
+        <button class="btn ghost" id="btnSelectAll">Select all</button>
+        <button class="btn ghost" id="btnSelectNone">Clear</button>
+        <button class="btn" id="btnSort" title="Reorder the selected authors alphabetically, keeping their positions">Sort selected A–Z</button>
+        <button class="btn ghost danger" id="btnDedupeA" title="Remove repeated author names">Dedupe</button>
+        <button class="btn" id="btnAddAuthor">Add author</button>
+      </div>
+    </div>
+    <div class="scroll" id="authorList"></div>
+  </section>
+
+  <!-- AFFILIATIONS -->
+  <section class="col">
+    <div class="col-head">
+      <span class="eyebrow">Affiliations</span>
+      <span class="count" id="affCount">0</span>
+      <div class="col-tools">
+        <button class="btn ghost danger" id="btnDedupeAff" title="Merge affiliations with identical text">Merge identical</button>
+        <button class="btn" id="btnAddAff">Add affiliation</button>
+      </div>
+    </div>
+    <div class="scroll" id="affList"></div>
+  </section>
+</div>
+
+<!-- PREVIEW DOCK -->
+<div class="dock" id="dock">
+  <div class="dock-head">
+    <span class="eyebrow">Manuscript preview</span>
+    <span class="hint">Numbered by first appearance. Copying from here keeps the superscripts.</span>
+    <div class="dock-actions">
+      <button class="btn" id="btnCopy">Copy author line</button>
+      <button class="btn ghost" id="btnToggleDock"><span class="chev">▾</span></button>
+    </div>
+  </div>
+  <div class="preview" id="preview"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<input type="file" id="fileDocx" accept=".docx" hidden>
+<input type="file" id="fileJson" accept=".json,application/json" hidden>
+
+<script>
+"use strict";
+/* ============================================================
+   etal — single-file author & affiliation manager
+   No external dependencies. Native ZIP read/write for .docx.
+   ============================================================ */
+
+/* ---------- state ---------- */
+let uid = 1;
+const nid = () => "id" + (uid++);
+let state = { authors: [], affs: [], affById: new Map() };
+const selected = new Set();
+
+function makeAff(text){
+  const a = { id: nid(), text: (text||"").trim() };
+  state.affs.push(a); state.affById.set(a.id, a); return a;
+}
+function makeAuthor(name, affIds){
+  const au = { id: nid(), name: name||"", affs: (affIds||[]).slice() };
+  state.authors.push(au); return au;
+}
+
+/* ---------- numbering (first appearance) ---------- */
+function numbering(){
+  const num = new Map(); let n = 0; const order = [];
+  for (const au of state.authors){
+    for (const aid of au.affs){
+      if (state.affById.has(aid) && !num.has(aid)){ num.set(aid, ++n); order.push(aid); }
+    }
+  }
+  return { num, order };
+}
+function usageCount(){
+  const c = new Map();
+  for (const au of state.authors) for (const aid of au.affs) c.set(aid,(c.get(aid)||0)+1);
+  return c;
+}
+
+/* ---------- helpers ---------- */
+const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const norm = s => (s||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
+  .toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+
+function toast(msg, isErr){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast show" + (isErr?" err":"");
+  clearTimeout(t._t); t._t = setTimeout(()=>t.className="toast",2200);
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  const {num} = numbering();
+  renderAuthors(num);
+  renderAffs(num);
+  updatePreview(num);
+  document.getElementById("authorCount").textContent = state.authors.length;
+  document.getElementById("affCount").textContent = num.size + " / " + state.affs.length;
+}
+
+function renderAuthors(num){
+  const host = document.getElementById("authorList");
+  host.innerHTML = "";
+  if (!state.authors.length){
+    host.innerHTML =
+      '<div class="empty"><div class="big">Start a manuscript<sup>1</sup></div>'+
+      '<p>Import an existing author list from a Word file, open a saved project, or add authors one by one. '+
+      'Affiliations number themselves and renumber whenever you move people around.</p>'+
+      '<div class="row">'+
+        '<button class="btn primary" onclick="document.getElementById(\'fileDocx\').click()">Import DOCX</button>'+
+        '<button class="btn" onclick="addAuthor()">Add the first author</button>'+
+      '</div></div>';
+    return;
+  }
+  state.authors.forEach((au, i) => {
+    const row = document.createElement("div");
+    row.className = "author" + (selected.has(au.id) ? " sel" : "");
+    row.dataset.id = au.id; row.draggable = true;
+
+    const chips = au.affs.map(aid=>{
+      const aff = state.affById.get(aid); if(!aff) return "";
+      const n = num.get(aid) || "·";
+      return '<span class="chip"><span class="n">'+n+'</span>'+
+             '<span class="t" title="'+esc(aff.text)+'">'+esc(aff.text||"(empty)")+'</span>'+
+             '<button class="x" data-act="unlink" data-aff="'+aid+'" title="Remove from this author">×</button></span>';
+    }).join("");
+
+    row.innerHTML =
+      '<span class="handle" title="Drag to reorder">⠿</span>'+
+      '<input type="checkbox" class="a-check" '+(selected.has(au.id)?"checked":"")+'>'+
+      '<span class="idx">'+(i+1)+'</span>'+
+      '<div class="a-body">'+
+        '<input class="a-name" value="'+esc(au.name)+'" placeholder="Author name" spellcheck="false">'+
+        '<div class="chips">'+chips+
+          '<button class="add-aff" data-act="addaff">+ affiliation</button>'+
+        '</div>'+
+      '</div>'+
+      '<button class="a-del" data-act="delauthor" title="Remove author">✕</button>';
+
+    // name edit (no full re-render → keeps focus)
+    const nameEl = row.querySelector(".a-name");
+    nameEl.addEventListener("input", e=>{ au.name = e.target.value; updatePreview(); });
+    nameEl.addEventListener("keydown", e=>{
+      if(e.key==="Enter"){ e.preventDefault(); addAuthorAfter(au.id); }
+    });
+
+    // checkbox select (+ shift-range)
+    const cb = row.querySelector(".a-check");
+    cb.addEventListener("click", e=>{
+      if(e.shiftKey && lastClicked){
+        const a = state.authors.findIndex(x=>x.id===lastClicked);
+        const b = i; const [lo,hi]=[Math.min(a,b),Math.max(a,b)];
+        for(let k=lo;k<=hi;k++) selected.add(state.authors[k].id);
+      } else {
+        if(cb.checked) selected.add(au.id); else selected.delete(au.id);
+      }
+      lastClicked = au.id; render();
+    });
+
+    row.querySelector('[data-act="delauthor"]').onclick = ()=>{ delAuthor(au.id); };
+    row.querySelector('[data-act="addaff"]').onclick = (e)=> openAffMenu(e.currentTarget, au.id);
+    row.querySelectorAll('[data-act="unlink"]').forEach(b=>{
+      b.onclick = ()=>{ au.affs = au.affs.filter(x=>x!==b.dataset.aff); render(); };
+    });
+
+    attachDrag(row, au.id);
+    host.appendChild(row);
+  });
+}
+
+function renderAffs(num){
+  const host = document.getElementById("affList");
+  host.innerHTML = "";
+  const use = usageCount();
+  if(!state.affs.length){
+    host.innerHTML = '<div style="color:var(--muted);padding:18px 8px;font-size:13px">No affiliations yet. '+
+      'They appear automatically as you attach them to authors, or add one directly.</div>';
+    return;
+  }
+  // numbered (in order) first, then unused
+  const ordered = [...state.affs].filter(a=>num.has(a.id)).sort((a,b)=>num.get(a.id)-num.get(b.id));
+  const unused  = state.affs.filter(a=>!num.has(a.id));
+  [...ordered, ...unused].forEach(aff=>{
+    const n = num.get(aff.id);
+    const u = use.get(aff.id)||0;
+    const row = document.createElement("div");
+    row.className = "aff" + (n?"":" unused");
+    row.innerHTML =
+      '<div class="num">'+(n||"—")+'</div>'+
+      '<textarea class="aff-text" rows="1" spellcheck="false" placeholder="Institution, city, country.">'+esc(aff.text)+'</textarea>'+
+      '<div class="aff-meta">'+
+        '<span class="use">'+(u?("×"+u):"unused")+'</span>'+
+        '<button class="aff-del" title="Delete affiliation">🗑</button>'+
+      '</div>';
+    const ta = row.querySelector(".aff-text");
+    const fit = ()=>{ ta.style.height="auto"; ta.style.height=ta.scrollHeight+"px"; };
+    requestAnimationFrame(fit);
+    ta.addEventListener("input", e=>{ aff.text=e.target.value; fit(); updatePreview(); });
+    row.querySelector(".aff-del").onclick = ()=>{
+      if(u>0 && !confirm("This affiliation is used by "+u+" author(s). Delete it and remove those links?")) return;
+      state.authors.forEach(a=>a.affs=a.affs.filter(x=>x!==aff.id));
+      state.affs = state.affs.filter(x=>x.id!==aff.id); state.affById.delete(aff.id);
+      render();
+    };
+    host.appendChild(row);
+  });
+}
+
+function updatePreview(num){
+  num = num || numbering().num;
+  const pv = document.getElementById("preview");
+  if(!state.authors.length){ pv.innerHTML='<span style="color:var(--muted)">Nothing to preview yet.</span>'; return; }
+  const last = state.authors.length-1;
+  const line = state.authors.map((au,i)=>{
+    const sep = i===0 ? "" : (i===last ? ", and " : ", ");
+    const nums = au.affs.map(a=>num.get(a)).filter(Boolean);
+    const sup = nums.length ? "<sup>"+nums.join(",")+"</sup>" : "";
+    return sep + esc(au.name||"(unnamed)") + sup;
+  }).join("");
+  const ordered = [...state.affs].filter(a=>num.has(a.id)).sort((a,b)=>num.get(a.id)-num.get(b.id));
+  const affs = ordered.map(a=>'<span class="pa"><sup>'+num.get(a.id)+'</sup> '+esc(a.text||"(empty)")+'</span>').join("");
+  pv.innerHTML = '<div class="pv-line">'+line+'</div>'+(affs?'<div class="pv-affs">'+affs+'</div>':'');
+}
+
+/* ============================================================
+   DRAG & DROP  (moves the whole selection if you drag a selected row)
+   ============================================================ */
+let dragIds = null, lastClicked = null;
+function attachDrag(row, id){
+  row.addEventListener("dragstart", e=>{
+    dragIds = selected.has(id) && selected.size>1 ? [...selected] : [id];
+    row.classList.add("dragging"); e.dataTransfer.effectAllowed="move";
+    try{ e.dataTransfer.setData("text/plain", id); }catch(_){}
+  });
+  row.addEventListener("dragend", ()=>{ row.classList.remove("dragging"); clearDropMarks(); dragIds=null; });
+  row.addEventListener("dragover", e=>{
+    e.preventDefault();
+    const before = (e.clientY - row.getBoundingClientRect().top) < row.offsetHeight/2;
+    clearDropMarks(); row.classList.add(before?"drop-before":"drop-after");
+  });
+  row.addEventListener("drop", e=>{
+    e.preventDefault();
+    const before = (e.clientY - row.getBoundingClientRect().top) < row.offsetHeight/2;
+    clearDropMarks();
+    if(!dragIds) return;
+    moveAuthors(dragIds, id, before);
+  });
+}
+function clearDropMarks(){ document.querySelectorAll(".author").forEach(r=>r.classList.remove("drop-before","drop-after")); }
+function moveAuthors(ids, targetId, before){
+  const moving = state.authors.filter(a=>ids.includes(a.id));
+  if(ids.includes(targetId)) return;          // dropping onto itself/selection
+  const rest = state.authors.filter(a=>!ids.includes(a.id));
+  let ti = rest.findIndex(a=>a.id===targetId);
+  if(ti<0){ render(); return; }
+  ti = before ? ti : ti+1;
+  rest.splice(ti, 0, ...moving);
+  state.authors = rest;
+  render();
+}
+
+/* ============================================================
+   AFFILIATION PICKER (attach existing or create new)
+   ============================================================ */
+let openMenu = null;
+function closeMenu(){ if(openMenu){ openMenu.remove(); openMenu=null; document.removeEventListener("mousedown",onDocDown,true);} }
+function onDocDown(e){ if(openMenu && !openMenu.contains(e.target)) closeMenu(); }
+function openAffMenu(anchor, authorId){
+  closeMenu();
+  const au = state.authors.find(a=>a.id===authorId);
+  const {num} = numbering();
+  const m = document.createElement("div"); m.className="menu";
+  const r = anchor.getBoundingClientRect();
+  m.style.left = Math.min(r.left, window.innerWidth-260)+"px";
+  m.style.top  = (r.bottom+4)+"px";
+  const search = document.createElement("input");
+  search.placeholder = "Search affiliations or type a new one…";
+  m.appendChild(search);
+  const listWrap = document.createElement("div");
+  m.appendChild(listWrap);
+
+  function draw(q){
+    listWrap.innerHTML="";
+    const ql = norm(q);
+    const avail = state.affs.filter(a=>!au.affs.includes(a.id));
+    const matches = avail.filter(a=>!ql || norm(a.text).includes(ql))
+                         .sort((a,b)=>(num.get(a.id)||9e9)-(num.get(b.id)||9e9));
+    matches.slice(0,40).forEach(a=>{
+      const o=document.createElement("div"); o.className="opt";
+      o.innerHTML='<span class="on">'+(num.get(a.id)||"·")+'</span><span>'+esc(a.text||"(empty)")+'</span>';
+      o.onmousedown=ev=>{ ev.preventDefault(); au.affs.push(a.id); closeMenu(); render(); };
+      listWrap.appendChild(o);
+    });
+    const q2=(q||"").trim();
+    const exact = q2 && state.affs.some(a=>norm(a.text)===norm(q2));
+    if(q2 && !exact){
+      if(matches.length){ const s=document.createElement("div"); s.className="sep"; listWrap.appendChild(s); }
+      const o=document.createElement("div"); o.className="opt new";
+      o.innerHTML='＋ Create “'+esc(q2.slice(0,60))+'”';
+      o.onmousedown=ev=>{ ev.preventDefault(); const a=makeAff(q2); au.affs.push(a.id); closeMenu(); render(); };
+      listWrap.appendChild(o);
+    }
+    if(!matches.length && !q2){
+      const o=document.createElement("div"); o.className="opt"; o.style.color="var(--muted)";
+      o.textContent="Type to create a new affiliation."; listWrap.appendChild(o);
+    }
+  }
+  draw("");
+  search.addEventListener("input",()=>draw(search.value));
+  search.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){ const q=search.value.trim(); if(!q) return;
+      const ex=state.affs.find(a=>norm(a.text)===norm(q));
+      const a= ex || makeAff(q); if(!au.affs.includes(a.id)) au.affs.push(a.id);
+      closeMenu(); render();
+    } else if(e.key==="Escape"){ closeMenu(); }
+  });
+  document.body.appendChild(m); openMenu=m;
+  setTimeout(()=>search.focus(),0);
+  document.addEventListener("mousedown",onDocDown,true);
+}
+
+/* ============================================================
+   AUTHOR OPS
+   ============================================================ */
+function addAuthor(){ const a=makeAuthor(""); render(); focusAuthor(a.id); }
+window.addAuthor = addAuthor;
+function addAuthorAfter(id){
+  const i=state.authors.findIndex(a=>a.id===id); const a={id:nid(),name:"",affs:[]};
+  state.authors.splice(i+1,0,a); render(); focusAuthor(a.id);
+}
+function focusAuthor(id){
+  requestAnimationFrame(()=>{
+    const row=document.querySelector('.author[data-id="'+id+'"] .a-name'); if(row){ row.focus(); }
+  });
+}
+function delAuthor(id){
+  state.authors=state.authors.filter(a=>a.id!==id); selected.delete(id); render();
+}
+function sortSelected(){
+  if(selected.size<2){ toast("Select at least two authors to sort."); return; }
+  const idxs=[]; state.authors.forEach((a,i)=>{ if(selected.has(a.id)) idxs.push(i); });
+  const picked=idxs.map(i=>state.authors[i])
+    .sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));
+  idxs.forEach((slot,k)=>{ state.authors[slot]=picked[k]; });
+  render(); toast("Sorted "+picked.length+" authors A–Z in place.");
+}
+function dedupeAuthors(){
+  const seen=new Map(); let removed=0;
+  const keep=[];
+  for(const a of state.authors){
+    const k=norm(a.name);
+    if(k && seen.has(k)){
+      // merge affiliations into the kept twin, then drop
+      const t=seen.get(k); a.affs.forEach(x=>{ if(!t.affs.includes(x)) t.affs.push(x); }); removed++;
+    } else { seen.set(k,a); keep.push(a); }
+  }
+  state.authors=keep; render();
+  toast(removed?("Removed "+removed+" duplicate author"+(removed>1?"s":"")+"."):"No duplicate authors found.");
+}
+function dedupeAffs(){
+  const byText=new Map(); const remap=new Map(); let removed=0;
+  for(const a of state.affs){
+    const k=norm(a.text);
+    if(k && byText.has(k)){ remap.set(a.id, byText.get(k).id); removed++; }
+    else byText.set(k,a);
+  }
+  if(!removed){ toast("No identical affiliations found."); return; }
+  state.authors.forEach(au=>{
+    const out=[]; for(const aid of au.affs){ const t=remap.get(aid)||aid; if(!out.includes(t)) out.push(t); } au.affs=out;
+  });
+  state.affs=state.affs.filter(a=>!remap.has(a.id));
+  state.affById=new Map(state.affs.map(a=>[a.id,a]));
+  render(); toast("Merged "+removed+" identical affiliation"+(removed>1?"s":"")+".");
+}
+
+/* ============================================================
+   ZIP  (native, no libraries)
+   ============================================================ */
+const CRC=(()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(buf){ let c=0xFFFFFFFF; for(let i=0;i<buf.length;i++) c=CRC[(c^buf[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+const te=new TextEncoder(), td=new TextDecoder();
+function zipStore(files){ // files: [{name, data:Uint8Array}]  -> Uint8Array (.zip, stored)
+  const chunks=[]; const central=[]; let offset=0;
+  const u16=v=>{const b=new Uint8Array(2);new DataView(b.buffer).setUint16(0,v,true);return b;};
+  const u32=v=>{const b=new Uint8Array(4);new DataView(b.buffer).setUint32(0,v>>>0,true);return b;};
+  for(const f of files){
+    const name=te.encode(f.name); const data=f.data; const crc=crc32(data);
+    const lh=[u32(0x04034b50),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0),name,data];
+    lh.forEach(c=>chunks.push(c));
+    central.push([u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),name]);
+    offset += 30+name.length+data.length;
+  }
+  const cstart=offset; const cchunks=[];
+  central.forEach(c=>{ c.forEach(x=>cchunks.push(x)); c.forEach(x=>offset+=x.length); });
+  const csize=offset-cstart;
+  const eocd=[u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),u32(csize),u32(cstart),u16(0)];
+  const all=[...chunks,...cchunks,...eocd];
+  let total=0; all.forEach(c=>total+=c.length);
+  const out=new Uint8Array(total); let p=0; all.forEach(c=>{ out.set(c,p); p+=c.length; });
+  return out;
+}
+async function zipRead(buf){ // ArrayBuffer -> Map(name -> Uint8Array)
+  const dv=new DataView(buf); const u8=new Uint8Array(buf);
+  // find EOCD
+  let eo=-1;
+  for(let i=u8.length-22;i>=0;i--){ if(dv.getUint32(i,true)===0x06054b50){ eo=i; break; } }
+  if(eo<0) throw new Error("Not a valid .docx (no ZIP end record).");
+  const count=dv.getUint16(eo+10,true); let p=dv.getUint32(eo+16,true);
+  const out=new Map();
+  for(let i=0;i<count;i++){
+    if(dv.getUint32(p,true)!==0x02014b50) throw new Error("Corrupt ZIP central directory.");
+    const method=dv.getUint16(p+10,true);
+    const csize=dv.getUint32(p+20,true);
+    const nlen=dv.getUint16(p+28,true), elen=dv.getUint16(p+30,true), clen=dv.getUint16(p+32,true);
+    const lho=dv.getUint32(p+42,true);
+    const name=td.decode(u8.subarray(p+46,p+46+nlen));
+    // local header to find data start
+    const lnlen=dv.getUint16(lho+26,true), lelen=dv.getUint16(lho+28,true);
+    const ds=lho+30+lnlen+lelen;
+    const comp=u8.subarray(ds, ds+csize);
+    let data;
+    if(method===0){ data=comp.slice(); }
+    else if(method===8){ data=await inflateRaw(comp); }
+    else throw new Error("Unsupported ZIP compression in file.");
+    out.set(name,data);
+    p += 46+nlen+elen+clen;
+  }
+  return out;
+}
+async function inflateRaw(bytes){
+  if(typeof DecompressionStream==="undefined") throw new Error("This browser can't decompress .docx. Try Chrome/Edge, or paste authors manually.");
+  const ds=new DecompressionStream("deflate-raw");
+  const stream=new Blob([bytes]).stream().pipeThrough(ds);
+  const ab=await new Response(stream).arrayBuffer();
+  return new Uint8Array(ab);
+}
+
+/* ============================================================
+   DOCX  EXPORT
+   ============================================================ */
+function runText(t){ return '<w:r><w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>'; }
+function runSup(t){ return '<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>'; }
+function exportDocx(){
+  if(!state.authors.length){ toast("Add or import some authors first.",true); return; }
+  const {num}=numbering();
+  const last=state.authors.length-1;
+  let authorRuns="";
+  state.authors.forEach((au,i)=>{
+    if(i>0) authorRuns += runText(i===last ? ", and " : ", ");
+    authorRuns += runText(au.name||"");
+    const ns=au.affs.map(a=>num.get(a)).filter(Boolean);
+    if(ns.length) authorRuns += runSup(ns.join(","));
+  });
+  const ordered=[...state.affs].filter(a=>num.has(a.id)).sort((a,b)=>num.get(a.id)-num.get(b.id));
+  let affParas="";
+  ordered.forEach(a=>{ affParas += '<w:p>'+runSup(String(num.get(a.id)))+runText(" "+a.text)+'</w:p>'; });
+
+  const W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  const document_xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<w:document '+W+'><w:body>'+
+    '<w:p>'+authorRuns+'</w:p><w:p/>'+affParas+
+    '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>'+
+    '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>'+
+    '</w:body></w:document>';
+  const styles_xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<w:styles '+W+'><w:docDefaults><w:rPrDefault><w:rPr>'+
+    '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>'+
+    '<w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults></w:styles>';
+  const ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+    '<Default Extension="xml" ContentType="application/xml"/>'+
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'+
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>';
+  const rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+  const drels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
+
+  const files=[
+    {name:"[Content_Types].xml", data:te.encode(ct)},
+    {name:"_rels/.rels", data:te.encode(rels)},
+    {name:"word/document.xml", data:te.encode(document_xml)},
+    {name:"word/styles.xml", data:te.encode(styles_xml)},
+    {name:"word/_rels/document.xml.rels", data:te.encode(drels)},
+  ];
+  const zip=zipStore(files);
+  download(new Blob([zip],{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}),"author_list.docx");
+  toast("Exported author_list.docx with live superscripts.");
+}
+
+/* ============================================================
+   DOCX  IMPORT
+   ============================================================ */
+async function importDocx(file){
+  try{
+    const buf=await file.arrayBuffer();
+    const parts=await zipRead(buf);
+    const docu=parts.get("word/document.xml");
+    if(!docu) throw new Error("No word/document.xml inside the file.");
+    const xml=td.decode(docu);
+    const dom=new DOMParser().parseFromString(xml,"application/xml");
+    if(dom.querySelector("parsererror")) throw new Error("Could not parse the document XML.");
+    const W="http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const paras=[...dom.getElementsByTagNameNS(W,"p")];
+
+    // turn each paragraph into tokens: {sup:bool, text}
+    function tokens(p){
+      const out=[];
+      for(const r of p.getElementsByTagNameNS(W,"r")){
+        const sup=!![...r.getElementsByTagNameNS(W,"vertAlign")].find(v=>v.getAttribute("w:val")==="superscript"||v.getAttributeNS(W,"val")==="superscript");
+        let t=""; for(const tn of r.getElementsByTagNameNS(W,"t")) t+=tn.textContent;
+        if(t!=="") out.push({sup,text:t});
+      }
+      return out;
+    }
+    const paraToks=paras.map(tokens);
+
+    // author paragraph = first paragraph containing a superscript run with a digit
+    let aIdx=paraToks.findIndex(toks=>toks.some(t=>t.sup&&/\d/.test(t.text)));
+    if(aIdx<0) aIdx=paraToks.findIndex(toks=>toks.map(t=>t.text).join("").includes(","));
+    if(aIdx<0) throw new Error("Couldn't find an author line in this document.");
+
+    // build placeholder string for splitting
+    let s="";
+    for(const tk of paraToks[aIdx]){
+      if(tk.sup && /\d/.test(tk.text)) s+="\u0001"+tk.text.replace(/[^0-9,]/g,"")+"\u0002";
+      else s+=tk.text;
+    }
+    s=s.replace(/,\s*and\s+/g,", \u0003").replace(/\s+and\s+/g,", ");
+    const parsedAuthors=[];
+    s.split(/,\s+/).map(x=>x.trim()).filter(Boolean).forEach(part=>{
+      part=part.replace(/\u0003/g,"");
+      const nums=[...part.matchAll(/\u0001([0-9,]+)\u0002/g)].map(m=>m[1]).join(",");
+      const name=part.replace(/\u0001[0-9,]+\u0002/g,"").replace(/[†‡*]/g,"").trim();
+      const list=nums.split(",").map(x=>x.trim()).filter(Boolean).map(Number);
+      if(name) parsedAuthors.push({name, nums:list});
+    });
+
+    // affiliations: paragraphs after author line that begin with a number
+    const affByNum=new Map();
+    for(let i=aIdx+1;i<paras.length;i++){
+      const txt=paraToks[i].map(t=>t.text).join("").trim();
+      const m=txt.match(/^(\d+)[\.\)]?\s+(.+)$/s);
+      if(m) affByNum.set(Number(m[1]), m[2].trim());
+    }
+
+    // rebuild state
+    state={authors:[],affs:[],affById:new Map()}; selected.clear(); uid=1;
+    const affIdByNum=new Map();
+    affByNum.forEach((text,n)=>{ const a=makeAff(text); affIdByNum.set(n,a.id); });
+    parsedAuthors.forEach(pa=>{
+      const ids=pa.nums.map(n=>{
+        if(affIdByNum.has(n)) return affIdByNum.get(n);
+        const a=makeAff(""); affIdByNum.set(n,a.id); return a.id;   // referenced but missing → blank slot
+      });
+      makeAuthor(pa.name, ids);
+    });
+    render();
+    const blanks=state.affs.filter(a=>!a.text).length;
+    toast("Imported "+state.authors.length+" authors, "+affByNum.size+" affiliations"+(blanks?(" ("+blanks+" blank to fill)"):"")+".");
+  }catch(err){ console.error(err); toast("Import failed: "+err.message,true); }
+}
+
+/* ============================================================
+   PROJECT  JSON  +  download helper
+   ============================================================ */
+function download(blob, name){
+  const u=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=u; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(u); a.remove(); },300);
+}
+function saveJson(){
+  const data={ v:1, authors:state.authors.map(a=>({name:a.name,affs:a.affs})), affs:state.affs.map(a=>({id:a.id,text:a.text})) };
+  download(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),"authorship_project.json");
+  toast("Saved authorship_project.json");
+}
+async function openJson(file){
+  try{
+    const data=JSON.parse(await file.text());
+    state={authors:[],affs:[],affById:new Map()}; selected.clear(); uid=1;
+    const map=new Map();
+    (data.affs||[]).forEach(a=>{ const na=makeAff(a.text); map.set(a.id,na.id); });
+    (data.authors||[]).forEach(a=>{ makeAuthor(a.name,(a.affs||[]).map(x=>map.get(x)).filter(Boolean)); });
+    render(); toast("Opened project: "+state.authors.length+" authors.");
+  }catch(err){ toast("Couldn't open project: "+err.message,true); }
+}
+
+/* ---------- copy author line with superscripts ---------- */
+async function copyLine(){
+  const pv=document.querySelector("#preview .pv-line"); if(!pv){ toast("Nothing to copy yet."); return; }
+  try{
+    const html=pv.innerHTML, text=pv.textContent;
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html":new Blob([html],{type:"text/html"}),
+      "text/plain":new Blob([text],{type:"text/plain"})
+    })]);
+    toast("Copied — paste into Word to keep the superscripts.");
+  }catch(_){
+    const r=document.createRange(); r.selectNodeContents(pv);
+    const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    document.execCommand("copy"); sel.removeAllRanges();
+    toast("Copied with formatting.");
+  }
+}
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+document.getElementById("btnAddAuthor").onclick=addAuthor;
+document.getElementById("btnAddAff").onclick=()=>{ makeAff(""); render();
+  requestAnimationFrame(()=>{ const els=document.querySelectorAll(".aff-text"); const el=els[els.length-1]; if(el) el.focus(); }); };
+document.getElementById("btnSelectAll").onclick=()=>{ state.authors.forEach(a=>selected.add(a.id)); render(); };
+document.getElementById("btnSelectNone").onclick=()=>{ selected.clear(); render(); };
+document.getElementById("btnSort").onclick=sortSelected;
+document.getElementById("btnDedupeA").onclick=dedupeAuthors;
+document.getElementById("btnDedupeAff").onclick=dedupeAffs;
+document.getElementById("btnExportDocx").onclick=exportDocx;
+document.getElementById("btnSaveJson").onclick=saveJson;
+document.getElementById("btnCopy").onclick=copyLine;
+document.getElementById("btnNew").onclick=()=>{ if(state.authors.length && !confirm("Start a new, empty project? Unsaved changes will be lost.")) return;
+  state={authors:[],affs:[],affById:new Map()}; selected.clear(); uid=1; render(); };
+document.getElementById("btnImportDocx").onclick=()=>document.getElementById("fileDocx").click();
+document.getElementById("btnImportJson").onclick=()=>document.getElementById("fileJson").click();
+document.getElementById("fileDocx").onchange=e=>{ if(e.target.files[0]) importDocx(e.target.files[0]); e.target.value=""; };
+document.getElementById("fileJson").onchange=e=>{ if(e.target.files[0]) openJson(e.target.files[0]); e.target.value=""; };
+document.getElementById("btnToggleDock").onclick=()=>document.getElementById("dock").classList.toggle("collapsed");
+window.addEventListener("resize",()=>{ if(openMenu) closeMenu(); });
+
+/* ---------- demo seed so the app isn't empty on first open ---------- */
+(function seed(){
+  const lyceum=makeAff("Lyceum of Aristotle, Athens, Classical Greece.");
+  const paris=makeAff("Latin Quarter, Paris, France.");
+  const basel=makeAff("University of Basel, Basel, Switzerland.");
+  const alexandria=makeAff("Great Library of Alexandria, Alexandria, Ptolemaic Egypt.");
+  makeAuthor("Aristotle",[lyceum.id]);
+  makeAuthor("Emile Cioran",[paris.id]);
+  makeAuthor("Friedrich Nietzsche",[basel.id]);
+  makeAuthor("Hypatia of Alexandria",[alexandria.id]);
+  makeAuthor("Leonardo da Vinci",[alexandria.id,lyceum.id]);
+  render();
+})();
+</script>
+</body>
+</html>
