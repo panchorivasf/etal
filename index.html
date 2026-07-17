@@ -186,7 +186,7 @@
       <ul>
         <li><strong>Add author</strong> — create a blank name field.</li>
         <li>Drag the handle to reorder; checkboxes select several authors.</li>
-        <li><strong>Sort selected A–Z</strong> — alphabetize only the checked authors, keeping their slots.</li>
+        <li><strong>Sort selected A–Z</strong> — alphabetize checked authors by last name, keeping their slots.</li>
         <li><strong>Dedupe</strong> — drop repeated names and merge their affiliations.</li>
         <li><kbd>+ affiliation</kbd> — attach an existing affiliation or type a new one.</li>
         <li>Drag affiliation chips to reorder superscripts for that author.</li>
@@ -267,7 +267,7 @@
       <div class="col-tools">
         <button class="btn ghost" id="btnSelectAll">Select all</button>
         <button class="btn ghost" id="btnSelectNone">Clear</button>
-        <button class="btn" id="btnSort" title="Reorder the selected authors alphabetically, keeping their positions">Sort selected A–Z</button>
+        <button class="btn" id="btnSort" title="Reorder the selected authors alphabetically by last name, keeping their positions">Sort selected A–Z</button>
         <button class="btn ghost danger" id="btnDedupeA" title="Remove repeated author names">Dedupe</button>
         <button class="btn" id="btnAddAuthor">Add author</button>
       </div>
@@ -349,6 +349,10 @@ function usageCount(){
 const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const norm = s => (s||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
   .toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+const lastName = s => {
+  const parts = (s||"").trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1].replace(/,$/, "") : "";
+};
 
 function toast(msg, isErr){
   const t = document.getElementById("toast");
@@ -672,9 +676,9 @@ function sortSelected(){
   if(selected.size<2){ toast("Select at least two authors to sort."); return; }
   const idxs=[]; state.authors.forEach((a,i)=>{ if(selected.has(a.id)) idxs.push(i); });
   const picked=idxs.map(i=>state.authors[i])
-    .sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));
+    .sort((a,b)=>lastName(a.name).localeCompare(lastName(b.name),undefined,{sensitivity:"base"}));
   idxs.forEach((slot,k)=>{ state.authors[slot]=picked[k]; });
-  render(); toast("Sorted "+picked.length+" authors A–Z in place.");
+  render(); toast("Sorted "+picked.length+" authors A–Z by last name.");
 }
 function dedupeAuthors(){
   const seen=new Map(); let removed=0;
